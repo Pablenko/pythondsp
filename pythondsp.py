@@ -9,10 +9,8 @@ def generate_sin(A, freq, t):
     return A*np.sin(2*np.pi*freq*t)
 
 
-def generate_frequencies(signal_params, generator):
-    fs = 1000.0
-    T = 3
-    t = np.arange(0, T*fs) / fs
+def generate_frequencies(sampling_freq, signal_params, generator):
+    t = np.arange(0, sampling_freq) / sampling_freq
     ret = np.zeros(len(t))
 
     for a, f in signal_params:
@@ -32,9 +30,33 @@ def dft(input):
     for k in xrange(dft_length):
         for n in xrange(signal_length):
             re_signal[k] += input[n] * np.cos(2*np.pi*k*n / signal_length)
-            im_signal[k] += -input[n] * np.sin(2*np.pi*k*n / signal_length)
+            im_signal[k] -= input[n] * np.sin(2*np.pi*k*n / signal_length)
 
     return re_signal, im_signal
+
+
+def idft(re, im):
+    dft_length = len(re)
+    output_signal_length = dft_length * 2
+
+    re_amplitude = np.zeros(len(re))
+    im_amplitude = np.zeros(len(im))
+    signal = np.zeros(output_signal_length)
+
+    for k, (r, i) in enumerate(zip(re, im)):
+        re_amplitude[k] = re[k] / dft_length
+        im_amplitude[k] = -im[k] / dft_length
+
+    re_amplitude[0] /= 2
+    re_amplitude[dft_length-1] /= 2
+
+    for n in xrange(output_signal_length):
+        for k in xrange(dft_length):
+            signal[n] += re_amplitude[k] * np.cos(2*np.pi*k*n/output_signal_length)
+            signal[n] += im_amplitude[k] * np.sin(2*np.pi*k*n/output_signal_length)
+
+    return signal
+
 
 
 def polar_coords(re, im):
@@ -49,18 +71,34 @@ def polar_coords(re, im):
     return [m for m in magnitude()], [p for p in phase()]
 
 
-def main():
-    signal_params = [signal_param(1, 1), signal_param(1, 5)]
-    x, y = generate_frequencies(signal_params, generate_sin)
+def convolution(input, conv_kernel):
+    input_length = len(input)
+    kernel_length = len(conv_kernel)
+    output_length = input_length + kernel_length - 1
 
-    re, im = dft(y)
-    x = np.arange(0, len(y)/2)
-    mag, phase = polar_coords(re, im)
+    output = np.zeros(output_length)
+
+    for i in xrange(input_length):
+        for j in xrange(kernel_length):
+            output[i+j] += input[i] * conv_kernel[j]
+
+    return output
+
+
+def main():
+    signal_params = [signal_param(2, 2)]
+    x, y = generate_frequencies(80.0, signal_params, generate_sin)
+
+    conv_kernel = np.zeros(9)
+    conv_kernel[2] = 1
+    conv_kernel[3] = -1
+
+    output = convolution(y, conv_kernel)
 
     plt.subplot(211)
-    plt.plot(x, mag)
+    plt.plot(x, y)
     plt.subplot(212)
-    plt.plot(x, phase)
+    plt.plot(np.arange(len(output)), output)
     plt.show()
 
 
